@@ -1,0 +1,81 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>tensegrity-data-harvester — prototype</title>
+  <style>
+    body{font-family:system-ui,Segoe UI,Roboto,Arial;margin:24px;color:#222}
+    pre{background:#f7f7f9;border:1px solid #e1e1e8;padding:10px;overflow:auto}
+    code{font-family:monospace;background:#fff;padding:1px 4px}
+    .note{color:#555;font-size:0.95em}
+    button{margin-top:6px}
+  </style>
+</head>
+<body>
+  <h1>tensegrity-data-harvester — prototype</h1>
+  <p>I live in a small museum and keep a research notebook. This tiny prototype helps you collect CSV/JSON files referenced by a Nature article and an africavernaculararchitecture.com page. It does not fetch anything automatically — that keeps provenance explicit and the repo public.</p>
+
+  <h2>Recommended workflow</h2>
+  <ol>
+    <li>Open the two source pages in a browser (Nature article; africavernaculararchitecture.com link). Inspect page HTML to find direct links to CSV/JSON or to supplementary materials (often labelled "Supplementary Data", "Supplementary Information", or "Download dataset").</li>
+    <li>For each candidate URL, download with curl or wget into a folder named <code>raw/</code>. Example commands are below.</li>
+    <li>Record provenance: create a small text file next to each download with the source URL, page title, and download date/time.</li>
+    <li>Run validation checks: confirm MIME, parse JSON or CSV headers, and log results. Example commands below show simple, reproducible checks using standard tools (curl, file, jq, and csvkit). If you lack csvkit, the CSV checks show awk alternatives.</li>
+  </ol>
+
+  <h2>Example fetch commands</h2>
+  <p>Replace URL and filename as needed.</p>
+  <pre><code># create folder
+mkdir -p raw provenance logs
+
+# fetch a CSV
+curl -L -o raw/dataset1.csv "https://example.org/path/to/dataset.csv"
+# fetch a JSON
+curl -L -o raw/dataset2.json "https://example.org/path/to/dataset.json"
+
+# save provenance note (record the page that referenced the data)
+echo "source: https://nature.example/article\nreferenced-from: https://nature.example/supplement\ndownloaded: $(date -u)" > provenance/dataset1.csv.source.txt
+</code></pre>
+
+  <h2>Simple validation commands</h2>
+  <p>These are minimal, POSIX-friendly checks you can run locally. They assume downloaded files live in raw/ and logs go to logs/.</p>
+  <pre><code># identify MIME/type and file size
+file -b --mime-type raw/dataset1.csv && ls -l raw/dataset1.csv > logs/dataset1.csv.stat.txt
+
+# quick CSV sanity: print header and row count
+(head -n 1 raw/dataset1.csv || true) > logs/dataset1.csv.header.txt
+(awk 'END{print NR" lines"}' raw/dataset1.csv) > logs/dataset1.csv.count.txt
+
+# quick JSON sanity using jq (if installed)
+jq --version >/dev/null 2>&1 && jq . raw/dataset2.json > logs/dataset2.json.pretty.json || echo "jq missing" > logs/dataset2.json.pretty.json
+</code></pre>
+
+  <h2>Validation log template</h2>
+  <pre><code>{
+  "filename": "raw/dataset1.csv",
+  "source_url": "https://...",
+  "downloaded_utc": "2026-11-10T00:00:00Z",
+  "mime": "text/csv",
+  "size_bytes": 12345,
+  "header": ["col1","col2","col3"],
+  "rows": 1000,
+  "checks": {
+    "parseable": true,
+    "missing_values_ratio": 0.02
+  },
+  "notes": "Found as Supplementary Table 2 on Nature article page"
+}
+</code></pre>
+
+  <h2>What to commit to this repository</h2>
+  <ul>
+    <li>raw/ files you downloaded (CSV/JSON).</li>
+    <li>provenance/*.source.txt files recording where each file was linked from and when you downloaded it.</li>
+    <li>logs/*.txt or .json validation outputs created by the commands above.</li>
+  </ul>
+
+  <p class="note">A final practical note: the Nature article may host data behind supplementary material links or on associated figshare/Zenodo repositories. The africavernaculararchitecture.com page could link to archives or embedded files. Inspect the pages, follow "download" links, and record each step. I prefer small, auditable steps over mystery downloads.</p>
+
+  <p style="margin-top:18px">— Marmalade, who will nap while you gather the files. If you paste candidate file URLs here, I can give targeted download and validation commands and a suggested provenance note for each.</p>
+</body>
+</html>
